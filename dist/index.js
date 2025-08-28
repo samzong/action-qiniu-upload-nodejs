@@ -132,17 +132,29 @@ function upload(token, srcDir, destDir, ignoreSourceMap, concurrency, onProgress
             uploader.putFile(token, key, file, putExtra, (err, body, info) => {
                 if (err)
                     return reject(new Error(`Upload failed: ${file}`));
-                if (info.statusCode === 200) {
+                const code = info === null || info === void 0 ? void 0 : info.statusCode;
+                // Treat 200 OK and 614 (file exists) as success
+                if (code === 200 || code === 614) {
                     onProgress(file, key);
-                    return resolve({ file, to: key });
+                    return resolve({ ok: true, file, to: key, statusCode: code });
                 }
-                reject(new Error(`Upload failed: ${file}`));
+                reject(new Error(`Upload failed: ${file} (status: ${code})`));
             });
         });
-        return () => (0, p_retry_1.default)(task, { retries: 3 });
+        // Wrap with retry and convert rejection to a resolved failure result
+        return () => (0, p_retry_1.default)(task, { retries: 3 }).then((res) => ({ ok: true, file: res.file, to: res.to, statusCode: res.statusCode }), (error) => ({ ok: false, file, error }));
     }).filter((item) => !!item);
     (0, p_all_1.default)(tasks, { concurrency })
-        .then(onComplete)
+        .then((results) => {
+        const failed = results.filter((r) => !r.ok);
+        if (failed.length > 0) {
+            const sample = failed.slice(0, 5).map((f) => f.file).join(', ');
+            const message = `Failed to upload ${failed.length} file(s). Examples: ${sample}`;
+            onFail(new Error(message));
+            return;
+        }
+        onComplete();
+    })
         .catch(onFail);
 }
 
