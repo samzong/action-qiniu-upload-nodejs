@@ -41,6 +41,10 @@ jobs:
         # Whether to ignore source maps.
         # Default: true
         ignore_source_map: true
+
+        # Support concurrency
+        # Default: 5
+        concurrency: 5
 ```
 
 ## License

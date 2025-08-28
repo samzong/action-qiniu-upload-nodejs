@@ -27,6 +27,10 @@ inputs:
     description: 'ignore source maps'
     default: true
     required: false
+  concurrency:
+    description: 'upload concurrency'
+    default: '5'
+    required: false
 runs:
   using: 'node12'
   main: 'dist/index.js'

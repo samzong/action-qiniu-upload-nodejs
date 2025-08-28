@@ -13,6 +13,7 @@ export function upload(
   srcDir: string,
   destDir: string,
   ignoreSourceMap: boolean,
+  concurrency: number,
   onProgress: (srcFile: string, destFile: string) => void,
   onComplete: () => void,
   onFail: (errorInfo: any) => void,
@@ -46,7 +47,7 @@ export function upload(
     return () => pRetry(task, { retries: 3 });
   }).filter((item) => !!item) as (() => Promise<any>)[];
 
-  pAll(tasks, { concurrency: 5 })
+  pAll(tasks, { concurrency })
     .then(onComplete)
     .catch(onFail);
 }

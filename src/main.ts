@@ -10,6 +10,7 @@ async function run(): Promise<void> {
     const sourceDir = core.getInput('source_dir');
     const destDir = core.getInput('dest_dir');
     const ignoreSourceMap = core.getInput('ignore_source_map') === 'true';
+    const concurrency = parseInt(core.getInput('concurrency') || '5', 10);
 
     const token = genToken(bucket, ak, sk);
 
@@ -18,12 +19,14 @@ async function run(): Promise<void> {
       sourceDir,
       destDir,
       ignoreSourceMap,
+      concurrency,
       (file, key) => core.info(`Success: ${file} => [${bucket}]: ${key}`),
       () => core.info('Done!'),
       (error) => core.setFailed(error.message),
     );
   } catch (error) {
-    core.setFailed(error.message);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    core.setFailed(errorMessage);
   }
 }
 
