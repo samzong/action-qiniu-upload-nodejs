@@ -111,7 +111,7 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.upload = upload;
 const qiniu_1 = __importDefault(__nccwpck_require__(34));
 const path_1 = __importDefault(__nccwpck_require__(6928));
-const glob_1 = __importDefault(__nccwpck_require__(1363));
+const glob_1 = __nccwpck_require__(1363);
 const p_all_1 = __importDefault(__nccwpck_require__(2790));
 const p_retry_1 = __importDefault(__nccwpck_require__(4995));
 function normalizePath(input) {
@@ -119,7 +119,7 @@ function normalizePath(input) {
 }
 function upload(token, srcDir, destDir, ignoreSourceMap, concurrency, onProgress, onComplete, onFail) {
     const baseDir = path_1.default.resolve(process.cwd(), srcDir);
-    const files = glob_1.default.sync(`${baseDir}/**/*`, { nodir: true });
+    const files = (0, glob_1.globSync)(`${baseDir}/**/*`, { nodir: true });
     const config = new qiniu_1.default.conf.Config();
     const uploader = new qiniu_1.default.form_up.FormUploader(config);
     const tasks = files.map((file) => {

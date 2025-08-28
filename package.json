@@ -1,13 +1,13 @@
 {
   "name": "action-qiniu-upload",
-  "version": "0.0.3",
+  "version": "0.0.5",
   "private": true,
   "description": "github action for uploading files to qiniu",
   "main": "lib/main.js",
   "scripts": {
     "build": "tsc",
     "lint": "eslint src/**/*.ts",
-    "pack": "ncc build",
+    "pack": "ncc build lib/main.js -o dist",
     "test": "jest --passWithNoTests",
     "all": "npm run build && npm run lint && npm run pack && npm test"
   },
