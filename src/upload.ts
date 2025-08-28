@@ -1,6 +1,6 @@
 import qiniu from 'qiniu';
 import path from 'path';
-import glob from 'glob';
+import { globSync } from 'glob';
 import pAll from 'p-all';
 import pRetry from 'p-retry';
 
@@ -19,12 +19,12 @@ export function upload(
   onFail: (errorInfo: any) => void,
 ): void {
   const baseDir = path.resolve(process.cwd(), srcDir);
-  const files = glob.sync(`${baseDir}/**/*`, { nodir: true });
+  const files = globSync(`${baseDir}/**/*`, { nodir: true });
 
   const config = new qiniu.conf.Config();
   const uploader = new qiniu.form_up.FormUploader(config);
 
-  const tasks = files.map((file) => {
+  const tasks = files.map((file: string) => {
     const relativePath = path.relative(baseDir, path.dirname(file));
     const key = normalizePath(path.join(destDir, relativePath, path.basename(file)));
 
@@ -45,7 +45,7 @@ export function upload(
     });
 
     return () => pRetry(task, { retries: 3 });
-  }).filter((item) => !!item) as (() => Promise<any>)[];
+  }).filter((item: any) => !!item) as (() => Promise<any>)[];
 
   pAll(tasks, { concurrency })
     .then(onComplete)
