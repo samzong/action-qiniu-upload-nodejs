@@ -25,6 +25,7 @@
   "dependencies": {
     "@actions/core": "^1.11.1",
     "glob": "^11.0.3",
+    "minimatch": "^10.0.3",
     "p-all": "^5.0.0",
     "p-retry": "^7.0.0",
     "qiniu": "^7.14.0"

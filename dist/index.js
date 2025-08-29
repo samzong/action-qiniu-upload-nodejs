@@ -1,6 +1,102 @@
 /******/ (() => { // webpackBootstrap
 /******/ 	var __webpack_modules__ = ({
 
+/***/ 9685:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.FileStrategyManager = void 0;
+const path_1 = __importDefault(__nccwpck_require__(6928));
+const minimatch_1 = __nccwpck_require__(6507);
+const DEFAULT_OVERWRITE_EXTENSIONS = [
+    // Web files
+    '.html', '.htm', '.css', '.js', '.jsx', '.ts', '.tsx',
+    // Data files
+    '.json', '.xml', '.yaml', '.yml',
+    // Documents
+    '.md', '.txt', '.rst',
+    // Config files
+    '.conf', '.config', '.ini', '.env',
+    // Build outputs
+    '.map', '.min.js', '.min.css',
+];
+const DEFAULT_SKIP_EXTENSIONS = [
+    // Images
+    '.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.ico', '.bmp', '.tiff',
+    // Videos
+    '.mp4', '.webm', '.mov', '.avi', '.mkv', '.flv', '.wmv',
+    // Audio
+    '.mp3', '.wav', '.ogg', '.flac', '.aac', '.m4a',
+    // Fonts
+    '.woff', '.woff2', '.ttf', '.otf', '.eot',
+    // Archives
+    '.zip', '.tar', '.gz', '.bz2', '.7z', '.rar',
+    // Binary files
+    '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
+];
+class FileStrategyManager {
+    constructor(options) {
+        this.options = options;
+        this.overwritePatterns = FileStrategyManager.parsePatterns(options.overwritePatterns);
+        this.skipPatterns = FileStrategyManager.parsePatterns(options.skipPatterns);
+    }
+    static parsePatterns(patterns) {
+        if (!(patterns === null || patterns === void 0 ? void 0 : patterns.trim()))
+            return [];
+        return patterns.split(',').map((p) => p.trim()).filter((p) => p.length > 0);
+    }
+    shouldOverwrite(filePath) {
+        const fileName = path_1.default.basename(filePath);
+        const ext = path_1.default.extname(filePath).toLowerCase();
+        // Check custom patterns first
+        if (this.overwritePatterns.length > 0) {
+            if (this.overwritePatterns.some((pattern) => ((0, minimatch_1.minimatch)(fileName, pattern) || (0, minimatch_1.minimatch)(filePath, pattern)))) {
+                return true;
+            }
+        }
+        if (this.skipPatterns.length > 0) {
+            if (this.skipPatterns.some((pattern) => ((0, minimatch_1.minimatch)(fileName, pattern) || (0, minimatch_1.minimatch)(filePath, pattern)))) {
+                return false;
+            }
+        }
+        // Apply global strategy
+        switch (this.options.overwrite) {
+            case 'always':
+                return true;
+            case 'never':
+                return false;
+            case 'smart':
+            default:
+                // Smart mode: overwrite code files, skip media files
+                if (DEFAULT_OVERWRITE_EXTENSIONS.includes(ext))
+                    return true;
+                if (DEFAULT_SKIP_EXTENSIONS.includes(ext))
+                    return false;
+                // For unknown extensions, be conservative and don't overwrite
+                return false;
+        }
+    }
+    static getFileCategory(filePath) {
+        const ext = path_1.default.extname(filePath).toLowerCase();
+        if (DEFAULT_OVERWRITE_EXTENSIONS.includes(ext)) {
+            return 'code';
+        }
+        if (DEFAULT_SKIP_EXTENSIONS.includes(ext)) {
+            return 'media';
+        }
+        return 'unknown';
+    }
+}
+exports.FileStrategyManager = FileStrategyManager;
+
+
+/***/ }),
+
 /***/ 5915:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
@@ -50,7 +146,6 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 const core = __importStar(__nccwpck_require__(7484));
-const token_1 = __nccwpck_require__(9961);
 const upload_1 = __nccwpck_require__(3607);
 function run() {
     return __awaiter(this, void 0, void 0, function* () {
@@ -60,10 +155,39 @@ function run() {
             const bucket = core.getInput('bucket');
             const sourceDir = core.getInput('source_dir');
             const destDir = core.getInput('dest_dir');
+            const overwrite = (core.getInput('overwrite') || 'smart');
+            const overwritePatterns = core.getInput('overwrite_patterns');
+            const skipPatterns = core.getInput('skip_patterns');
             const ignoreSourceMap = core.getInput('ignore_source_map') === 'true';
             const concurrency = parseInt(core.getInput('concurrency') || '5', 10);
-            const token = (0, token_1.genToken)(bucket, ak, sk);
-            (0, upload_1.upload)(token, sourceDir, destDir, ignoreSourceMap, concurrency, (file, key) => core.info(`Success: ${file} => [${bucket}]: ${key}`), () => core.info('Done!'), (error) => core.setFailed(error.message));
+            (0, upload_1.upload)(bucket, ak, sk, sourceDir, destDir, {
+                overwrite,
+                overwritePatterns,
+                skipPatterns,
+                ignoreSourceMap,
+                concurrency,
+            }, (file, key, action) => {
+                let actionEmoji = '✅';
+                let actionText = 'Uploaded';
+                if (action === 'updated') {
+                    actionEmoji = '🔄';
+                    actionText = 'Updated';
+                }
+                else if (action === 'skipped') {
+                    actionEmoji = '⏭️';
+                    actionText = 'Skipped (exists)';
+                }
+                core.info(`${actionEmoji} ${actionText}: ${file} => [${bucket}]: ${key}`);
+            }, (stats) => {
+                core.info('Upload Summary:');
+                core.info(`📤 New files: ${stats.uploaded}`);
+                core.info(`🔄 Updated files: ${stats.updated}`);
+                core.info(`⏭️ Skipped files: ${stats.skipped}`);
+                if (stats.failed > 0) {
+                    core.info(`❌ Failed: ${stats.failed}`);
+                }
+                core.info('Done!');
+            }, (error) => core.setFailed(error.message));
         }
         catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
@@ -87,10 +211,15 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.genToken = genToken;
 const qiniu_1 = __importDefault(__nccwpck_require__(34));
-function genToken(bucket, ak, sk) {
+function genToken(bucket, ak, sk, fileKey, allowOverwrite = false) {
     const mac = new qiniu_1.default.auth.digest.Mac(ak, sk);
+    let scope = bucket;
+    if (allowOverwrite && fileKey) {
+        // Use "bucket:key" format to allow overwriting specific file
+        scope = `${bucket}:${fileKey}`;
+    }
     const putPolicy = new qiniu_1.default.rs.PutPolicy({
-        scope: bucket,
+        scope,
     });
     const token = putPolicy.uploadToken(mac);
     return token;
@@ -114,46 +243,81 @@ const path_1 = __importDefault(__nccwpck_require__(6928));
 const glob_1 = __nccwpck_require__(1363);
 const p_all_1 = __importDefault(__nccwpck_require__(2790));
 const p_retry_1 = __importDefault(__nccwpck_require__(4995));
+const token_1 = __nccwpck_require__(9961);
+const fileStrategy_1 = __nccwpck_require__(9685);
 function normalizePath(input) {
     return input.replace(/^\//, '');
 }
-function upload(token, srcDir, destDir, ignoreSourceMap, concurrency, onProgress, onComplete, onFail) {
+function upload(bucket, ak, sk, srcDir, destDir, options, onProgress, onComplete, onFail) {
     const baseDir = path_1.default.resolve(process.cwd(), srcDir);
     const files = (0, glob_1.globSync)(`${baseDir}/**/*`, { nodir: true });
     const config = new qiniu_1.default.conf.Config();
     const uploader = new qiniu_1.default.form_up.FormUploader(config);
+    const strategyManager = new fileStrategy_1.FileStrategyManager(options);
     const tasks = files.map((file) => {
         const relativePath = path_1.default.relative(baseDir, path_1.default.dirname(file));
         const key = normalizePath(path_1.default.join(destDir, relativePath, path_1.default.basename(file)));
-        if (ignoreSourceMap && file.endsWith('.map'))
+        // Skip source maps if requested
+        if (options.ignoreSourceMap && file.endsWith('.map'))
             return null;
+        const shouldOverwrite = strategyManager.shouldOverwrite(file);
         const task = () => new Promise((resolve, reject) => {
+            // Generate token based on overwrite strategy
+            const token = (0, token_1.genToken)(bucket, ak, sk, key, shouldOverwrite);
             const putExtra = new qiniu_1.default.form_up.PutExtra();
             uploader.putFile(token, key, file, putExtra, (err, body, info) => {
                 if (err)
                     return reject(new Error(`Upload failed: ${file}`));
                 const code = info === null || info === void 0 ? void 0 : info.statusCode;
-                // Treat 200 OK and 614 (file exists) as success
-                if (code === 200 || code === 614) {
-                    onProgress(file, key);
-                    return resolve({ ok: true, file, to: key, statusCode: code });
+                let action;
+                if (code === 200) {
+                    // File was uploaded (new or overwritten)
+                    action = shouldOverwrite ? 'updated' : 'uploaded';
                 }
-                reject(new Error(`Upload failed: ${file} (status: ${code})`));
+                else if (code === 614) {
+                    // File exists and was not overwritten
+                    action = 'skipped';
+                }
+                else {
+                    return reject(new Error(`Upload failed: ${file} (status: ${code})`));
+                }
+                onProgress(file, key, action);
+                return resolve({
+                    ok: true, file, to: key, statusCode: code, action,
+                });
             });
         });
         // Wrap with retry and convert rejection to a resolved failure result
-        return () => (0, p_retry_1.default)(task, { retries: 3 }).then((res) => ({ ok: true, file: res.file, to: res.to, statusCode: res.statusCode }), (error) => ({ ok: false, file, error }));
+        return () => (0, p_retry_1.default)(task, { retries: 3 }).then((res) => ({
+            ok: true,
+            file: res.file,
+            to: res.to,
+            statusCode: res.statusCode,
+            action: res.action,
+        }), (error) => ({
+            ok: false,
+            file,
+            error,
+            action: 'skipped',
+        }));
     }).filter((item) => !!item);
-    (0, p_all_1.default)(tasks, { concurrency })
+    (0, p_all_1.default)(tasks, { concurrency: options.concurrency })
         .then((results) => {
         const failed = results.filter((r) => !r.ok);
+        const successful = results.filter((r) => r.ok);
+        const stats = {
+            uploaded: successful.filter((r) => r.action === 'uploaded').length,
+            updated: successful.filter((r) => r.action === 'updated').length,
+            skipped: successful.filter((r) => r.action === 'skipped').length,
+            failed: failed.length,
+        };
         if (failed.length > 0) {
             const sample = failed.slice(0, 5).map((f) => f.file).join(', ');
             const message = `Failed to upload ${failed.length} file(s). Examples: ${sample}`;
             onFail(new Error(message));
             return;
         }
-        onComplete();
+        onComplete(stats);
     })
         .catch(onFail);
 }
@@ -53767,7 +53931,7 @@ function expand_(str, isTop) {
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.Glob = void 0;
-const minimatch_1 = __nccwpck_require__(1409);
+const minimatch_1 = __nccwpck_require__(6507);
 const node_url_1 = __nccwpck_require__(3136);
 const path_scurry_1 = __nccwpck_require__(6577);
 const pattern_js_1 = __nccwpck_require__(7813);
@@ -54021,7 +54185,7 @@ exports.Glob = Glob;
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.hasMagic = void 0;
-const minimatch_1 = __nccwpck_require__(1409);
+const minimatch_1 = __nccwpck_require__(6507);
 /**
  * Return true if the patterns provided contain any magic glob characters,
  * given the options provided.
@@ -54059,7 +54223,7 @@ exports.hasMagic = hasMagic;
 // Ignores are always parsed in dot:true mode
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.Ignore = void 0;
-const minimatch_1 = __nccwpck_require__(1409);
+const minimatch_1 = __nccwpck_require__(6507);
 const pattern_js_1 = __nccwpck_require__(7813);
 const defaultPlatform = (typeof process === 'object' &&
     process &&
@@ -54186,10 +54350,10 @@ exports.globStream = globStream;
 exports.globSync = globSync;
 exports.globIterateSync = globIterateSync;
 exports.globIterate = globIterate;
-const minimatch_1 = __nccwpck_require__(1409);
+const minimatch_1 = __nccwpck_require__(6507);
 const glob_js_1 = __nccwpck_require__(2981);
 const has_magic_js_1 = __nccwpck_require__(5197);
-var minimatch_2 = __nccwpck_require__(1409);
+var minimatch_2 = __nccwpck_require__(6507);
 Object.defineProperty(exports, "escape", ({ enumerable: true, get: function () { return minimatch_2.escape; } }));
 Object.defineProperty(exports, "unescape", ({ enumerable: true, get: function () { return minimatch_2.unescape; } }));
 var glob_js_2 = __nccwpck_require__(2981);
@@ -54257,7 +54421,7 @@ exports.glob.glob = exports.glob;
 // this is just a very light wrapper around 2 arrays with an offset index
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.Pattern = void 0;
-const minimatch_1 = __nccwpck_require__(1409);
+const minimatch_1 = __nccwpck_require__(6507);
 const isPatternList = (pl) => pl.length >= 1;
 const isGlobList = (gl) => gl.length >= 1;
 /**
@@ -54483,7 +54647,7 @@ exports.Pattern = Pattern;
 // synchronous utility for filtering entries and calculating subwalks
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.Processor = exports.SubWalks = exports.MatchRecord = exports.HasWalkedCache = void 0;
-const minimatch_1 = __nccwpck_require__(1409);
+const minimatch_1 = __nccwpck_require__(6507);
 /**
  * A cache of which patterns have been processed for a given Path
  */
@@ -55177,7 +55341,7 @@ exports.GlobStream = GlobStream;
 
 /***/ }),
 
-/***/ 8895:
+/***/ 7305:
 /***/ ((__unused_webpack_module, exports) => {
 
 "use strict";
@@ -55198,7 +55362,7 @@ exports.assertValidPattern = assertValidPattern;
 
 /***/ }),
 
-/***/ 3238:
+/***/ 1803:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
@@ -55206,8 +55370,8 @@ exports.assertValidPattern = assertValidPattern;
 // parse a single path portion
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.AST = void 0;
-const brace_expressions_js_1 = __nccwpck_require__(5192);
-const unescape_js_1 = __nccwpck_require__(9829);
+const brace_expressions_js_1 = __nccwpck_require__(1090);
+const unescape_js_1 = __nccwpck_require__(851);
 const types = new Set(['!', '?', '+', '*', '@']);
 const isExtglobType = (c) => types.has(c);
 // Patterns that get prepended to bind to the start of either the
@@ -55797,7 +55961,7 @@ exports.AST = AST;
 
 /***/ }),
 
-/***/ 5192:
+/***/ 1090:
 /***/ ((__unused_webpack_module, exports) => {
 
 "use strict";
@@ -55956,7 +56120,7 @@ exports.parseClass = parseClass;
 
 /***/ }),
 
-/***/ 6726:
+/***/ 800:
 /***/ ((__unused_webpack_module, exports) => {
 
 "use strict";
@@ -55985,7 +56149,7 @@ exports.escape = escape;
 
 /***/ }),
 
-/***/ 1409:
+/***/ 6507:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
@@ -55993,10 +56157,10 @@ exports.escape = escape;
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.unescape = exports.escape = exports.AST = exports.Minimatch = exports.match = exports.makeRe = exports.braceExpand = exports.defaults = exports.filter = exports.GLOBSTAR = exports.sep = exports.minimatch = void 0;
 const brace_expansion_1 = __nccwpck_require__(1215);
-const assert_valid_pattern_js_1 = __nccwpck_require__(8895);
-const ast_js_1 = __nccwpck_require__(3238);
-const escape_js_1 = __nccwpck_require__(6726);
-const unescape_js_1 = __nccwpck_require__(9829);
+const assert_valid_pattern_js_1 = __nccwpck_require__(7305);
+const ast_js_1 = __nccwpck_require__(1803);
+const escape_js_1 = __nccwpck_require__(800);
+const unescape_js_1 = __nccwpck_require__(851);
 const minimatch = (p, pattern, options = {}) => {
     (0, assert_valid_pattern_js_1.assertValidPattern)(pattern);
     // shortcut: comments match nothing.
@@ -56991,11 +57155,11 @@ class Minimatch {
 }
 exports.Minimatch = Minimatch;
 /* c8 ignore start */
-var ast_js_2 = __nccwpck_require__(3238);
+var ast_js_2 = __nccwpck_require__(1803);
 Object.defineProperty(exports, "AST", ({ enumerable: true, get: function () { return ast_js_2.AST; } }));
-var escape_js_2 = __nccwpck_require__(6726);
+var escape_js_2 = __nccwpck_require__(800);
 Object.defineProperty(exports, "escape", ({ enumerable: true, get: function () { return escape_js_2.escape; } }));
-var unescape_js_2 = __nccwpck_require__(9829);
+var unescape_js_2 = __nccwpck_require__(851);
 Object.defineProperty(exports, "unescape", ({ enumerable: true, get: function () { return unescape_js_2.unescape; } }));
 /* c8 ignore stop */
 exports.minimatch.AST = ast_js_1.AST;
@@ -57006,7 +57170,7 @@ exports.minimatch.unescape = unescape_js_1.unescape;
 
 /***/ }),
 
-/***/ 9829:
+/***/ 851:
 /***/ ((__unused_webpack_module, exports) => {
 
 "use strict";

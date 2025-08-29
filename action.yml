@@ -19,10 +19,16 @@ inputs:
     description: 'dest dir, namely key prefix'
     default: '/'
     required: false
-  # overwrite:
-  #   description: 'overwrite the file of same key in bucket'
-  #   default: true
-  #   required: false
+  overwrite:
+    description: 'overwrite strategy: always, never, smart (default: smart - overwrites code files but skips media files)'
+    default: 'smart'
+    required: false
+  overwrite_patterns:
+    description: 'custom glob patterns for files to always overwrite (comma-separated)'
+    required: false
+  skip_patterns:
+    description: 'custom glob patterns for files to always skip (comma-separated)'
+    required: false
   ignore_source_map:
     description: 'ignore source maps'
     default: true
