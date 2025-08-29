@@ -1,4 +1,7 @@
-name: 'Qiniu Upload'
+name: 'Qiniu Upload v2'
+branding:
+  icon: 'upload-cloud
+  color: 'blue'
 description: 'github action for uploading files to qiniu'
 author: 'Jiulong Hu'
 inputs:
